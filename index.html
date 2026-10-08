@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cash-Flow | Salary & Expense Tracker</title>
+  <meta name="description" content="Salary and expense tracker module">
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <div id="threshold-alert" class="threshold-alert hidden">
+    <span>⚠️ CRITICAL: Remaining balance has dropped below 10% of your salary! Review your expenses immediately.</span>
+    <button id="close-alert-btn" aria-label="Close alert">X</button>
+  </div>
+
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-text">
+          <h1>Cash<span>Flow</span></h1>
+          <p>Salary & Expense Tracker</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div class="currency-switcher">
+          <label for="currency-select" class="sr-only">Currency</label>
+          <div class="select-wrapper">
+            <select id="currency-select" aria-label="Select currency">
+              <option value="INR">INR</option>
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="JPY">JPY</option>
+              <option value="AED">AED</option>
+            </select>
+          </div>
+          <span id="exchange-rate-label" class="exchange-label">Base: INR</span>
+        </div>
+        <button id="download-report-btn" class="btn btn-outline" aria-label="Download PDF Report">
+          Export PDF
+        </button>
+        <button id="reset-all-btn" class="btn btn-danger-ghost" aria-label="Reset all data">
+          Reset All
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main-container">
+
+    <aside class="panel panel-left">
+      <section class="card salary-card" aria-label="Salary Input">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Set Monthly Salary</h2>
+            <p class="card-subtitle">Define your total income</p>
+          </div>
+        </div>
+
+        <form id="salary-form" novalidate>
+          <div class="form-group">
+            <label for="salary-input">Total Salary <span class="currency-inline" id="salary-currency-label">(INR)</span></label>
+            <div class="input-wrapper">
+              <span class="input-prefix" id="salary-prefix-symbol">₹</span>
+              <input type="number" id="salary-input" name="salary" placeholder="e.g. 75000" min="1" step="1" aria-required="true">
+            </div>
+            <span class="error-msg" id="salary-error" role="alert" aria-live="polite"></span>
+          </div>
+          <button type="submit" class="btn btn-primary w-full" id="set-salary-btn">
+            Set Salary
+          </button>
+        </form>
+      </section>
+
+      <section class="card expense-card" aria-label="Add Expense">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Add Expense</h2>
+            <p class="card-subtitle">Log a new spending item</p>
+          </div>
+        </div>
+
+        <form id="expense-form" novalidate>
+          <div class="form-group">
+            <label for="expense-name-input">Expense Name</label>
+            <div class="input-wrapper">
+              <input type="text" id="expense-name-input" name="expenseName" placeholder="e.g. Rent, Groceries" maxlength="50" aria-required="true">
+            </div>
+            <span class="error-msg" id="expense-name-error" role="alert" aria-live="polite"></span>
+          </div>
+
+          <div class="form-group">
+            <label for="expense-amount-input">Amount <span class="currency-inline" id="expense-currency-label">(INR)</span></label>
+            <div class="input-wrapper">
+              <span class="input-prefix" id="expense-prefix-symbol">₹</span>
+              <input type="number" id="expense-amount-input" name="expenseAmount" placeholder="e.g. 12000" min="1" step="1" aria-required="true">
+            </div>
+            <span class="error-msg" id="expense-amount-error" role="alert" aria-live="polite"></span>
+          </div>
+
+          <button type="submit" class="btn btn-accent w-full" id="add-expense-btn">
+            Add Expense
+          </button>
+        </form>
+      </section>
+
+      <section class="card quick-stats" aria-label="Quick Statistics">
+        <h2 class="card-title">Quick Stats</h2>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <span class="stat-label">Total Expenses</span>
+            <span class="stat-value" id="stat-count">0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Avg. Expense</span>
+            <span class="stat-value" id="stat-avg">₹0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Largest Expense</span>
+            <span class="stat-value" id="stat-max">₹0</span>
+          </div>
+          <div class="stat-item">
+            <span class="stat-label">Savings Rate</span>
+            <span class="stat-value" id="stat-rate">0%</span>
+          </div>
+        </div>
+      </section>
+    </aside>
+
+    <section class="panel panel-right">
+
+      <div class="summary-grid">
+        <div class="summary-card salary-summary" id="salary-summary-card">
+          <div class="summary-info">
+            <span class="summary-label">Monthly Salary</span>
+            <span class="summary-value" id="display-salary">₹0</span>
+          </div>
+        </div>
+
+        <div class="summary-card expense-summary">
+          <div class="summary-info">
+            <span class="summary-label">Total Expenses</span>
+            <span class="summary-value" id="display-expenses">₹0</span>
+          </div>
+        </div>
+
+        <div class="summary-card balance-summary" id="balance-summary-card">
+          <div class="summary-info">
+            <span class="summary-label">Remaining Balance</span>
+            <span class="summary-value" id="display-balance">₹0</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bottom-grid">
+
+        <div class="card chart-card" aria-label="Expense Pie Chart">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Spending Overview</h2>
+              <p class="card-subtitle">Balance vs Expenses</p>
+            </div>
+          </div>
+          <div class="chart-container">
+            <canvas id="expense-chart" aria-label="Pie chart showing remaining balance vs total expenses"></canvas>
+            <div class="chart-empty" id="chart-empty-state">
+              <p>Add expenses to see chart</p>
+            </div>
+          </div>
+          <div class="chart-legend" id="chart-legend">
+            <div class="legend-item">
+              <span class="legend-dot balance-dot"></span>
+              <span>Remaining Balance</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot expense-dot"></span>
+              <span>Total Expenses</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card expense-list-card" aria-label="Expense List">
+          <div class="card-header">
+            <div>
+              <h2 class="card-title">Expense Log</h2>
+            </div>
+            <button class="btn btn-ghost btn-sm clear-all-btn" id="clear-expenses-btn" aria-label="Clear all expenses">
+              Clear All
+            </button>
+          </div>
+
+          <div class="expense-list-wrapper">
+            <ul id="expense-list" class="expense-list" aria-label="List of expenses"></ul>
+
+            <div class="empty-state" id="expense-empty-state">
+              <h3>No expenses yet</h3>
+              <p>Start by setting your salary, then add your first expense.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>Cash-Flow &copy; 2026</p>
+  </footer>
+
+  <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
